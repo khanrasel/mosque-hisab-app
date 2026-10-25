@@ -18,39 +18,49 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check ZIP file
+        run: |
+          ls -lah
+          test -f mosque_hisab_android_project.zip
+          unzip -t mosque_hisab_android_project.zip
+
+      - name: Extract project
+        run: |
+          mkdir -p extracted
+          unzip -q mosque_hisab_android_project.zip -d extracted
+          echo "Files inside ZIP:"
+          find extracted -maxdepth 6 -type f | head -200
+
+      - name: Locate Gradle project
+        run: |
+          GRADLEW=$(find extracted -type f -name gradlew | head -n 1)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: gradlew file not found."
+            echo "The ZIP may not contain a complete Android project."
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$GRADLEW")
+
+          if [ ! -f "$PROJECT_DIR/settings.gradle" ] && \
+             [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
+            echo "ERROR: Gradle settings file not found."
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Project directory: $PROJECT_DIR"
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
-        run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Check ZIP file
-        run: |
-          ls -lh
-          test -f mosque_hisab_android_project.zip
-
-      - name: Extract project
-        run: |
-          unzip -q mosque_hisab_android_project.zip -d extracted
-          find extracted -maxdepth 3 -name gradlew -print
-
-      - name: Locate Android project
-        run: |
-          GRADLEW=$(find extracted -maxdepth 3 -type f -name gradlew | head -n 1)
-
-          if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew not found in ZIP file"
-            exit 1
-          fi
-
-          echo "PROJECT_DIR=$(dirname "$GRADLEW")" >> "$GITHUB_ENV"
 
       - name: Build Debug APK
         run: |
@@ -58,7 +68,13 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
+      - name: Find APK
+        if: success()
+        run: |
+          find extracted -type f -name '*.apk' -print
+
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: mosque-hisab-apk
