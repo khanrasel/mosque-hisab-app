@@ -18,20 +18,23 @@ jobs:
         run: |
           echo "Repository files:"
           ls -lah
-          if [ ! -f "mosque_hisab_android_project.zip" ]; then
+          ZIP_FILE="MosqueHisabApp-fixed.zip"
+
+          if [ ! -f "$ZIP_FILE" ]; then
             echo "ERROR: ZIP file not found!"
-            echo "Available ZIP files:"
-            find . -maxdepth 3 -type f -iname "*.zip"
             exit 1
           fi
 
-          unzip -t mosque_hisab_android_project.zip
+          unzip -t "$ZIP_FILE"
 
       - name: Extract project
         run: |
           mkdir -p extracted
-          unzip -q mosque_hisab_android_project.zip -d extracted
-          echo "Searching for Gradle project..."
+          unzip -q MosqueHisabApp-fixed.zip -d extracted
+
+          echo "Files inside ZIP:"
+          find extracted -maxdepth 6 -type f | head -200
+          echo "Searching for Gradle wrapper:"
           find extracted -type f -name gradlew -print
 
       - name: Locate Gradle project
