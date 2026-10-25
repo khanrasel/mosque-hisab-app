@@ -64,9 +64,11 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK packages
+      - name: Check Android SDK
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          adb --version
+          sdkmanager --version
 
       - name: Build Debug APK
         run: |
