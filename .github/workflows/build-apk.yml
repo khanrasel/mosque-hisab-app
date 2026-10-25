@@ -3,12 +3,8 @@ name: Build Mosque Hisab APK
 on:
   workflow_dispatch:
   push:
-    paths:
-      - 'mosque_hisab_android_project.zip'
-      - '.github/workflows/build-apk.yml'
-
-permissions:
-  contents: read
+    branches:
+      - main
 
 jobs:
   build:
@@ -20,24 +16,30 @@ jobs:
 
       - name: Check ZIP file
         run: |
+          echo "Repository files:"
           ls -lah
-          test -f mosque_hisab_android_project.zip
+          if [ ! -f "mosque_hisab_android_project.zip" ]; then
+            echo "ERROR: ZIP file not found!"
+            echo "Available ZIP files:"
+            find . -maxdepth 3 -type f -iname "*.zip"
+            exit 1
+          fi
+
           unzip -t mosque_hisab_android_project.zip
 
       - name: Extract project
         run: |
           mkdir -p extracted
           unzip -q mosque_hisab_android_project.zip -d extracted
-          echo "Files inside ZIP:"
-          find extracted -maxdepth 6 -type f | head -200
+          echo "Searching for Gradle project..."
+          find extracted -type f -name gradlew -print
 
       - name: Locate Gradle project
         run: |
           GRADLEW=$(find extracted -type f -name gradlew | head -n 1)
 
           if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew file not found."
-            echo "The ZIP may not contain a complete Android project."
+            echo "ERROR: gradlew not found in ZIP file"
             exit 1
           fi
 
@@ -45,7 +47,7 @@ jobs:
 
           if [ ! -f "$PROJECT_DIR/settings.gradle" ] && \
              [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
-            echo "ERROR: Gradle settings file not found."
+            echo "ERROR: Gradle settings file not found"
             exit 1
           fi
 
@@ -62,16 +64,15 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
       - name: Build Debug APK
         run: |
           cd "$PROJECT_DIR"
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
-
-      - name: Find APK
-        if: success()
-        run: |
-          find extracted -type f -name '*.apk' -print
 
       - name: Upload APK
         if: success()
