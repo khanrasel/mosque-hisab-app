@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - 'mosque_hisab_android_project.zip'
+      - '.github/workflows/build-apk.yml'
 
 permissions:
   contents: read
@@ -12,6 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,25 +24,44 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      sdkmanager "platform-tools"
-sdkmanager "platforms;android-35"
-sdkmanager "build-tools;35.0.0"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Install SDK packages
+      - name: Install Android SDK packages
         run: |
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Extract project
-        run: unzip -q mosque_hisab_android_project.zip
-
-      - name: Build APK
+      - name: Check ZIP file
         run: |
-          cd mosque_hisab_android_project
+          ls -lh
+          test -f mosque_hisab_android_project.zip
+
+      - name: Extract project
+        run: |
+          unzip -q mosque_hisab_android_project.zip -d extracted
+          find extracted -maxdepth 3 -name gradlew -print
+
+      - name: Locate Android project
+        run: |
+          GRADLEW=$(find extracted -maxdepth 3 -type f -name gradlew | head -n 1)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: gradlew not found in ZIP file"
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$(dirname "$GRADLEW")" >> "$GITHUB_ENV"
+
+      - name: Build Debug APK
+        run: |
+          cd "$PROJECT_DIR"
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: mosque-hisab-apk
-          path: '**/build/outputs/apk/debug/*.apk'
+          path: extracted/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
